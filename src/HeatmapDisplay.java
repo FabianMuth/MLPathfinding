@@ -7,13 +7,12 @@ import javax.imageio.ImageIO;
 
 public class HeatmapDisplay extends JFrame {
     private JLabel heatmapLabel;
-    public static int cunt = 5;
-
     public HeatmapDisplay(int width, int height) {
         super("Heatmap Display");
         setSize(width, height);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLocationRelativeTo(null);
+        //setLocationRelativeTo(null);
+        setLocation(getWidth()+400, getHeight()/4);
 
         Color darkBackgroundColor = new Color(30, 30, 30);
         getContentPane().setBackground(darkBackgroundColor);

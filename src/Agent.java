@@ -144,6 +144,10 @@ public class Agent {
         this.y = y;
     }
 
+    public void setSpeed(int speed) {
+        this.speed = speed;
+    }
+
     public void setRandomness(int rdm) {
         this.randomness = rdm;
     }

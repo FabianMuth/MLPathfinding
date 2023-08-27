@@ -13,72 +13,62 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 public class AgentDrawer extends JFrame {
+    Settings settings;
+    JPanel mainDrawingPanel;
+    int mainDrawingPanelWidth, mainDrawingPanelHeight;
     ArrayList<Agent> agents;
-    static int agentsSize = 100;
-    static int lifespan = 300;
     static int currentStep = 0;
     Timer timer;
-    int maxGenerations = 500;
     int currentGeneration = 1;
     float bestDistance = 9999;
     ArrayList<Agent> bestAgents = new ArrayList<>();
-    int bestAgentsCount = 2;
     HashMap<Integer, Integer> bestSteps;
     int goalX, goalY, goalWidth, goalHeight;
     BufferedImage heatMapImage;
     HeatmapDisplay heatmapDisplay;
 
-    JSlider speedSlider;
-    JSlider randomnessSlider;
     public AgentDrawer() {
         super("MLPathfinding");
 
+        mainDrawingPanelWidth = 600;
+        mainDrawingPanelHeight = 600;
+
         getContentPane().setBackground(Color.WHITE);
-        setSize(600, 600);
+        setSize(800, mainDrawingPanelHeight);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+
+        settings = new Settings(this);
 
         agents = new ArrayList<>();
         bestSteps = new HashMap<>();
 
-        goalX = getWidth()/2-getWidth()/4/2;
-        goalY = getHeight() - 30;
-        goalWidth = getWidth()/4;
-        goalHeight = 30;
+        mainDrawingPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                drawGoal(g);
+                drawBest(g);
+                drawAgents(g);
+            }
+        };
 
-        heatMapImage = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
-        heatmapDisplay = new HeatmapDisplay(600, 600);
+        mainDrawingPanel.setPreferredSize(new Dimension(mainDrawingPanelWidth, mainDrawingPanelHeight));
+        mainDrawingPanel.setBackground(Color.LIGHT_GRAY);
+
+        goalWidth = mainDrawingPanelWidth/4;
+        goalHeight = 30;
+        goalX = mainDrawingPanelWidth/2-mainDrawingPanelWidth/4/2;
+        goalY = mainDrawingPanelHeight - goalHeight;
+
+
+        heatMapImage = new BufferedImage(mainDrawingPanelWidth,mainDrawingPanelHeight, BufferedImage.TYPE_INT_ARGB);
+        heatmapDisplay = new HeatmapDisplay(mainDrawingPanelWidth, mainDrawingPanelHeight);
         heatmapDisplay.setVisible(true);
 
-        speedSlider = new JSlider(2, 200, 50);
-        randomnessSlider = new JSlider(0, 100, 25);
-
-        speedSlider.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                int speedValue = speedSlider.getValue();
-                timer.setDelay(speedValue);
-            }
-        });
-
-        randomnessSlider.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                int randomnessValue = randomnessSlider.getValue();
-                for (Agent a : agents) {
-                    a.setRandomness(randomnessValue);
-                }
-            }
-        });
-
-        JPanel sliderPanel = new JPanel();
-        sliderPanel.setLayout(new GridLayout(2, 2));
-        sliderPanel.add(new JLabel("Speed:"));
-        sliderPanel.add(speedSlider);
-        sliderPanel.add(new JLabel("Randomness:"));
-        sliderPanel.add(randomnessSlider);
-
-        getContentPane().add(sliderPanel, BorderLayout.NORTH);
+        add(mainDrawingPanel, BorderLayout.CENTER);
+        add(settings, BorderLayout.WEST);
+        pack();
     }
 
     public void updateAgentsPos() {
@@ -94,9 +84,10 @@ public class AgentDrawer extends JFrame {
     }
 
     public void saveHeatMap() {
+        if(!settings.isDisplayHeatmap()) return;
         try {
             ImageIO.write(heatMapImage, "PNG", new File("agent_heatmap.png"));
-            decreaseOpacity(heatMapImage, 0.95f);
+            decreaseOpacity(heatMapImage, settings.getHeatMapFalloff());
             heatmapDisplay.updateHeatmap();
             System.out.println("saving heatmap");
         } catch (IOException e) {
@@ -138,8 +129,8 @@ public class AgentDrawer extends JFrame {
     public void drawBest(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setColor(Color.RED);
-        int h = (int) (getHeight() - bestDistance + goalHeight/2 + 10);
-        g2d.drawLine(0, h, getWidth(), h);
+        int h = (int) (mainDrawingPanel.getHeight() - bestDistance + goalHeight/2 + 10);
+        g2d.drawLine(0, h, mainDrawingPanel.getWidth(), h);
     }
 
     public void drawGoal(Graphics g) {
@@ -148,24 +139,24 @@ public class AgentDrawer extends JFrame {
         g2d.fillRect(goalX, goalY, goalWidth, goalHeight);
     }
 
-    public void paint(Graphics g) {
+    /*public void paint(Graphics g) {
         super.paint(g);
         drawGoal(g);
         drawBest(g);
         drawAgents(g);
-    }
+    }*/
 
     public void initAgents() {
-        for(int i = 0; i < agentsSize; i++) {
-            agents.add(new Agent(0,0, lifespan));
+        for(int i = 0; i < settings.getAgentCount(); i++) {
+            agents.add(new Agent(0,0, settings.getAgentLifespan()));
         }
         setAgentsGoal();
     }
 
     public void evolveAgents() {
-        int batchSize = agents.size() / bestAgentsCount;
+        int batchSize = agents.size() / settings.getBestAgentCount();
 
-        for (int i = 0; i < bestAgentsCount; i++) {
+        for (int i = 0; i < settings.getBestAgentCount(); i++) {
             Agent bestAgent = bestAgents.get(i);
 
             int startIndex = i * batchSize;
@@ -195,7 +186,7 @@ public class AgentDrawer extends JFrame {
                 System.out.println(a.distanceToGoal());
                 bestDistance = a.distanceToGoal();
             }
-            if (bestAgents.size() < bestAgentsCount) {
+            if (bestAgents.size() < settings.getBestAgentCount()) {
                 bestAgents.add(a);
             } else {
                 float currentDist = a.distanceToGoal();
@@ -213,6 +204,20 @@ public class AgentDrawer extends JFrame {
         }
     }
 
+    public void setAgentSpeed() {
+        int agentSpeed = settings.getAgentSpeed();
+        for (Agent a : agents) {
+            a.setSpeed(agentSpeed);
+        }
+    }
+
+    public void setAgentRandomness() {
+        int randomnessValue = settings.getRandomness();
+        for (Agent a : agents) {
+            a.setRandomness(randomnessValue);
+        }
+    }
+
     public void setAgentsPos(int x, int y) {
         for (Agent a : agents) {
             a.setX(x);
@@ -225,7 +230,7 @@ public class AgentDrawer extends JFrame {
         SwingUtilities.invokeLater(() -> {
             ag.setVisible(true);
             ag.initAgents();
-            ag.setAgentsPos(ag.getWidth() / 2, 200);
+            ag.setAgentsPos(ag.mainDrawingPanel.getWidth() / 2, 200);
 
             ActionListener timerListener = new ActionListener() {
                 @Override
@@ -233,14 +238,14 @@ public class AgentDrawer extends JFrame {
                     ag.updateAgentsPos();
                     ag.repaint();
                     currentStep++;
-                    if (currentStep >= lifespan) {
+                    if (currentStep >= ag.settings.getAgentLifespan()) {
                         ag.timer.stop();
                         ag.evaluateBestAgents();
                         ag.evolveAgents();
-                        ag.setAgentsPos(ag.getWidth() / 2, 200);
+                        ag.setAgentsPos(ag.mainDrawingPanel.getWidth() / 2, 200);
                         ag.saveHeatMap();
 
-                        if (ag.currentGeneration < ag.maxGenerations) {
+                        if (ag.currentGeneration < ag.settings.getMaxGenerations()) {
                             ag.currentGeneration++;
                             currentStep = 0;
                             ag.timer.start();
@@ -249,11 +254,8 @@ public class AgentDrawer extends JFrame {
                 }
             };
 
-            ag.timer = new Timer(50, timerListener);
+            ag.timer = new Timer(ag.settings.getSimulationSpeed(), timerListener);
             ag.timer.start();
-
-            //Timer timer = new Timer(250, e -> ag.heatmapDisplay.updateHeatmap());
-            //timer.start();
         });
     }
 }
